@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Defesa em profundidade: a janela só carrega scripts e estilos dos arquivos do próprio
+     programa e não faz nenhuma conexão de rede. Mesmo que algum texto importado ou gerado
+     por IA um dia conseguisse injetar HTML, não teria como carregar código de fora nem
+     enviar dados para lugar nenhum. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>StudyIA</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Ícones (um só lugar; usados com <svg><use href="#i-nome"/></svg>) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 2.5 8 12 13l9.5-5L12 3Z"/><path d="m2.5 12.5 9.5 5 9.5-5"/><path d="m2.5 17 9.5 5 9.5-5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M7.5 9.5h9M7.5 14h5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 16v2.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V16"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3.5 12.9 9l5.6 1.9-5.6 1.9L11 18.5l-1.9-5.7L3.5 10.9 9.1 9 11 3.5Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/><path d="M3 20.5h18"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 7.6 7.5 9 4.4-1.4 7.5-4.4 7.5-9V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c.6 3.2 5 5.2 5 10a5 5 0 0 1-10 0c0-1.9.9-3.1 2-4 .1 1.7.9 2.6 2 2.8-.6-3.2-.4-5.5 1-8.8Z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 3 3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/><path d="m6.5 7 .8 12.5h9.4L17.5 7"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M4.5 4.5v5h5"/><path d="M5.6 14.5a7.5 7.5 0 1 0 1.2-7.2L4.5 9.5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11.5"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 20h15"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2H9l2 2h7.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-10Z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5.5"/><path d="m11 6-6 6 6 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8.5 5.5v13M15.5 5.5v13"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6.5 3.5h7l4 4v13h-11v-17Z"/><path d="M13.5 3.5v4h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5h4l1.5 3h6l1.5-3h4"/><path d="M5.5 5.5h13l2 8v5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18.5v-5l2-8Z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ====================================================== barra lateral -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark"><svg class="ico"><use href="#i-check"/></svg></span>
+      <span class="brand-name">Study<b>IA</b></span>
+    </div>
+
+    <nav class="nav" aria-label="Seções">
+      <button class="nav-item active" data-view="home"><svg class="ico"><use href="#i-layers"/></svg><span>Início</span></button>
+      <button class="nav-item" data-view="manage"><svg class="ico"><use href="#i-list"/></svg><span>Questões</span></button>
+      <button class="nav-item" data-view="import"><svg class="ico"><use href="#i-upload"/></svg><span>Importar</span></button>
+      <button class="nav-item" data-view="ai"><svg class="ico"><use href="#i-sparkles"/></svg><span>Gerar com IA</span></button>
+      <button class="nav-item" data-view="stats"><svg class="ico"><use href="#i-chart"/></svg><span>Progresso</span></button>
+    </nav>
+
+    <div class="nav-group">
+      <div class="nav-group-head">
+        <span>Baralhos</span>
+        <button class="icon-btn" id="btn-new-deck-side" title="Novo baralho" aria-label="Novo baralho"><svg class="ico"><use href="#i-plus"/></svg></button>
+      </div>
+      <div id="sidebar-decks" class="side-decks"></div>
+    </div>
+
+    <div class="sidebar-foot">
+      <button class="nav-item" data-view="settings"><svg class="ico"><use href="#i-sliders"/></svg><span>Ajustes</span></button>
+    </div>
+  </aside>
+
+  <!-- =========================================================== conteúdo -->
+  <div class="content" id="content">
+  <main id="main">
+
+  <!-- ============================================================= INÍCIO -->
+  <section id="view-home" class="view active">
+    <header class="page-head">
+      <div>
+        <h1>Início</h1>
+        <p class="page-sub" id="page-date"></p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="btn-study-all" hidden><svg class="ico"><use href="#i-play"/></svg><span>Estudar tudo</span></button>
+        <button class="btn primary" id="btn-new-deck"><svg class="ico"><use href="#i-plus"/></svg><span>Novo baralho</span></button>
+      </div>
+    </header>
+
+    <div class="summary" id="home-summary"></div>
+
+    <form id="form-deck" class="card form hidden">
+      <div class="grid-2">
+        <div class="field">
+          <label for="deck-name">Nome do baralho</label>
+          <input id="deck-name" placeholder="Ex.: Direito Constitucional — TRT" maxlength="120" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="deck-desc">Descrição <span class="muted">(opcional)</span></label>
+          <input id="deck-desc" placeholder="Edital, matéria, o que ajudar a lembrar" autocomplete="off">
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn primary">Criar baralho</button>
+        <button type="button" class="btn ghost" id="cancel-deck">Cancelar</button>
+      </div>
+    </form>
+
+    <h2 class="section-title" id="decks-title">Seus baralhos</h2>
+    <div id="deck-list" class="deck-grid"></div>
+  </section>
+
+  <!-- ============================================================= ESTUDO -->
+  <section id="view-study" class="view study">
+    <div class="study-bar">
+      <button class="btn ghost small" data-go="home"><svg class="ico"><use href="#i-back"/></svg><span>Sair</span></button>
+      <div class="study-meta">
+        <span id="study-deck-name" class="study-deck"></span>
+        <span class="pill" id="study-left"></span>
+        <span class="pill score" id="study-score" hidden></span>
+        <span class="pill timer" id="study-timer"><svg class="ico"><use href="#i-clock"/></svg><span id="study-timer-text">0s</span></span>
+      </div>
+    </div>
+    <div class="progress" id="study-progress" role="progressbar" aria-label="Progresso da sessão" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="study-progress-bar"></span></div>
+
+    <div class="study-stage"><div id="study-body"></div></div>
+  </section>
+
+  <!-- =========================================================== QUESTÕES -->
+  <section id="view-manage" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Questões</h1>
+        <p class="page-sub" id="manage-sub">Cadastre, edite e organize o conteúdo dos seus baralhos.</p>
+      </div>
+      <div class="page-actions">
+        <select id="manage-deck" aria-label="Baralho"></select>
+        <button class="btn primary" id="btn-new-card"><svg class="ico"><use href="#i-plus"/></svg><span>Nova questão</span></button>
+      </div>
+    </header>
+
+    <div id="deck-header"></div>
+
+    <form id="form-card" class="card form hidden">
+      <div class="field inline-field">
+        <label for="card-kind">Tipo</label>
+        <select id="card-kind">
+          <option value="quiz">Múltipla escolha</option>
+          <option value="flash">Flashcard (frente/verso)</option>
+        </select>
+        <input type="hidden" id="card-id">
+      </div>
+      <div class="field">
+        <label id="label-question" for="card-question">Pergunta</label>
+        <textarea id="card-question" rows="3" required></textarea>
+      </div>
+
+      <div id="quiz-fields" class="field">
+        <label>Alternativas <span class="muted">— marque a correta</span></label>
+        <div id="options-list"></div>
+        <button type="button" class="btn ghost small" id="btn-add-option"><svg class="ico"><use href="#i-plus"/></svg><span>alternativa</span></button>
+      </div>
+
+      <div class="field hidden" id="flash-fields">
+        <label for="card-back">Verso (resposta)</label>
+        <textarea id="card-back" rows="3"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="card-explanation">Explicação <span class="muted">— aparece quando você erra</span></label>
+        <textarea id="card-explanation" rows="3" placeholder="Por que a correta está certa e onde a pegadinha mora"></textarea>
+      </div>
+      <div class="field">
+        <label for="card-tags">Tags <span class="muted">(opcional)</span></label>
+        <input id="card-tags" placeholder="ex.: controle de constitucionalidade, ADI" autocomplete="off">
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn primary">Salvar</button>
+        <button type="button" class="btn ghost" id="cancel-card">Cancelar</button>
+      </div>
+    </form>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="ico"><use href="#i-search"/></svg>
+        <input id="manage-search" class="search" type="search" placeholder="Buscar por enunciado ou tag…" aria-label="Buscar questões" autocomplete="off">
+      </div>
+      <div class="chips" id="manage-filters" role="group" aria-label="Filtrar por situação">
+        <button class="chip active" data-filter="all">Todas</button>
+        <button class="chip" data-filter="new">Novas</button>
+        <button class="chip" data-filter="learning">Aprendendo</button>
+        <button class="chip" data-filter="review">Em revisão</button>
+        <button class="chip" data-filter="lapsed">Que errei</button>
+      </div>
+    </div>
+    <div id="card-count" class="muted count-line"></div>
+    <div id="card-list" class="card-list"></div>
+  </section>
+
+  <!-- ========================================================== IMPORTAR -->
+  <section id="view-import" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Importar questões</h1>
+        <p class="page-sub">Traga um arquivo pronto ou cole o texto. Aceita JSON, CSV e texto simples — o formato é detectado sozinho.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="btn-example"><svg class="ico"><use href="#i-file"/></svg><span>Ver exemplo de formato</span></button>
+      </div>
+    </header>
+
+    <div class="card form">
+      <div class="grid-2">
+        <div class="field">
+          <label for="import-deck">Baralho de destino</label>
+          <select id="import-deck"></select>
+        </div>
+        <div class="field">
+          <label for="import-deck-new">Ou criar um novo</label>
+          <input id="import-deck-new" placeholder="Nome do novo baralho" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="dropzone" id="drop-zone">
+        <span class="drop-ico"><svg class="ico big"><use href="#i-file"/></svg></span>
+        <div><b>Arraste um arquivo para cá</b> <span class="muted">ou</span></div>
+        <label class="btn small" for="import-file">Escolher arquivo…</label>
+        <input type="file" id="import-file" accept=".json,.csv,.txt,.md,.markdown" hidden>
+        <div class="muted small-text">.json · .csv · .txt · .md</div>
+      </div>
+
+      <div class="field">
+        <label for="import-content">Ou cole o conteúdo</label>
+        <textarea id="import-content" rows="9" placeholder="Cole aqui…"></textarea>
+      </div>
+      <div class="actions">
+        <select id="import-format" aria-label="Formato">
+          <option value="auto">Detectar formato</option>
+          <option value="json">JSON</option>
+          <option value="csv">CSV</option>
+          <option value="markdown">Texto / Markdown</option>
+        </select>
+        <button class="btn primary" id="btn-preview-import">Pré-visualizar</button>
+      </div>
+    </div>
+
+    <div id="import-preview"></div>
+  </section>
+
+  <!-- ================================================================ IA -->
+  <section id="view-ai" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Gerar questões com IA</h1>
+        <p class="page-sub">Cole o material — resumo, texto da lei, anotações — ou só descreva o tema, e o Gemini monta as questões com explicação.</p>
+      </div>
+    </header>
+
+    <div id="ai-key-box"></div>
+
+    <div class="card form">
+      <div class="field">
+        <label for="ai-material">Assunto ou material de estudo</label>
+        <textarea id="ai-material" rows="8" placeholder="Cole o resumo, o texto da lei, suas anotações — ou só descreva o tema: 'Lei 8.112/90, regime disciplinar'"></textarea>
+        <div class="counter" id="ai-count" aria-live="polite"></div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label for="ai-n">Quantidade</label>
+          <input type="number" id="ai-n" value="10" min="1" max="20">
+        </div>
+        <div class="field">
+          <label for="ai-kind">Tipo</label>
+          <select id="ai-kind">
+            <option value="quiz">Múltipla escolha</option>
+            <option value="flash">Flashcards</option>
+            <option value="mixed">Misturado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ai-difficulty">Dificuldade</label>
+          <select id="ai-difficulty">
+            <option>fácil</option>
+            <option selected>médio</option>
+            <option>difícil</option>
+            <option>nível banca de concurso</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ai-notes">Instruções extras <span class="muted">(opcional)</span></label>
+        <input id="ai-notes" placeholder="ex.: foque em prazos e exceções; use linguagem da FCC" autocomplete="off">
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-generate"><svg class="ico"><use href="#i-sparkles"/></svg><span>Gerar questões</span></button>
+        <span class="muted" id="ai-status" role="status"></span>
+      </div>
+      <div id="ai-error" role="alert"></div>
+      <p class="notice"><svg class="ico"><use href="#i-shield"/></svg><span>O texto que você colar aqui é enviado ao Google (Gemini) para gerar as questões. No plano gratuito o Google pode usar o conteúdo enviado para melhorar seus produtos — confira os termos dele. Evite dados pessoais ou sigilosos.</span></p>
+    </div>
+
+    <div id="ai-preview"></div>
+  </section>
+
+  <!-- ========================================================= PROGRESSO -->
+  <section id="view-stats" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Progresso</h1>
+        <p class="page-sub">Seu histórico de revisões e o que vem pela frente.</p>
+      </div>
+      <div class="page-actions">
+        <select id="stats-deck" aria-label="Baralho"></select>
+      </div>
+    </header>
+    <div id="stats-body"></div>
+  </section>
+
+  <!-- ============================================================ AJUSTES -->
+  <section id="view-settings" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Ajustes</h1>
+        <p class="page-sub">Aparência, seus dados e o que o programa protege.</p>
+      </div>
+    </header>
+
+    <div class="settings-list">
+      <div class="card settings-block">
+        <div class="settings-text">
+          <h3>Aparência</h3>
+          <p class="muted">Automático segue o tema do Windows.</p>
+        </div>
+        <div class="segmented" id="theme-picker" role="group" aria-label="Tema">
+          <button data-theme-choice="auto">Automático</button>
+          <button data-theme-choice="claro">Claro</button>
+          <button data-theme-choice="escuro">Escuro</button>
+        </div>
+      </div>
+
+      <div class="card settings-block">
+        <div class="settings-text">
+          <h3>Seus dados</h3>
+          <p class="muted">Tudo fica num único arquivo neste computador. O backup leva baralhos, questões e histórico — <b>nunca a chave da API</b>.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" id="btn-backup"><svg class="ico"><use href="#i-download"/></svg><span>Exportar backup…</span></button>
+          <button class="btn ghost" id="btn-open-data"><svg class="ico"><use href="#i-folder"/></svg><span>Abrir pasta</span></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Privacidade e segurança</h3>
+        <ul class="checklist">
+          <li><svg class="ico"><use href="#i-lock"/></svg><span>A chave da API fica <b>criptografada com o Windows</b> (DPAPI), presa à sua conta de usuário. Copiar o arquivo de dados para outro computador não leva a chave.</span></li>
+          <li><svg class="ico"><use href="#i-shield"/></svg><span>O StudyIA <b>não abre portas nem serve nada na rede</b>. A única conexão que ele mesmo faz é o pedido ao Gemini, e só quando você clica em <i>Gerar</i>.</span></li>
+          <li><svg class="ico"><use href="#i-check"/></svg><span>Suas questões e seu progresso <b>nunca saem deste computador</b>.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="muted about"><span id="about-version">StudyIA</span> · Developed by <a href="#" id="link-author">Atylla Azevedo</a></p>
+  </section>
+
+  </main>
+  </div>
+</div>
+
+<!-- Caixa de diálogo única, reaproveitada para confirmações e pequenos formulários -->
+<dialog id="modal" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="actions modal-actions">
+      <button type="button" class="btn ghost" id="modal-cancel">Cancelar</button>
+      <button type="button" class="btn primary" id="modal-ok">Confirmar</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

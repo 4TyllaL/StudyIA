@@ -1,0 +1,71 @@
+StudyIA — versão portátil
+==========================
+
+1. Salve o StudyIA.exe onde quiser (Área de Trabalho, Documentos, um pendrive...).
+   Não precisa instalar nada. Não precisa de internet para estudar.
+
+2. Dê dois cliques no StudyIA.exe.
+
+Esta é a versão que não instala: não cria atalhos nem aparece na lista de
+programas do Windows. Para apagar, basta excluir o arquivo. Se preferir o
+programa instalado, com atalho no Menu Iniciar, use o StudyIA-Instalador.exe.
+
+
+"O Windows protegeu o seu PC" — e agora?
+-----------------------------------------
+
+Na primeira vez o Windows pode mostrar uma tela azul com esse aviso. Ele aparece
+para qualquer programa novo que ainda não é conhecido pela Microsoft — não quer
+dizer que tem vírus.
+
+Para abrir:
+
+    Clique em "Mais informações"  ->  "Executar assim mesmo"
+
+Isso só acontece na primeira vez.
+
+
+Demora uns segundos para abrir
+-------------------------------
+
+Aparece uma telinha escrita "StudyIA - abrindo..." e, 3 ou 4 segundos depois, a
+janela do programa. Não precisa clicar de novo: se você clicar várias vezes, ele
+continua abrindo uma janela só.
+
+
+Onde ficam minhas questões e meu progresso
+-------------------------------------------
+
+Num arquivo no seu computador:
+
+    %LOCALAPPDATA%\StudyIA\studyia.db
+
+Para fazer backup, use Ajustes > Exportar backup (salva seus estudos sem a chave).
+(Cole esse caminho na barra do Explorador de Arquivos que ele abre a pasta.)
+
+
+Para gerar questões automaticamente (opcional)
+-----------------------------------------------
+
+Na aba "Gerar com IA" o programa pede uma chave do Google Gemini. É gratuita
+para uso leve:
+
+    1. Acesse  https://aistudio.google.com/apikey
+    2. Entre com sua conta Google e clique em criar chave
+    3. Copie e cole a chave na tela do StudyIA
+
+A chave fica guardada com a criptografia do Windows, presa à sua conta: ela não
+aparece de novo na tela e não vai junto se você copiar seus dados para outro
+computador. O texto que você pedir para gerar questões é enviado ao Google —
+não cole dados pessoais ou sigilosos.
+
+Sem a chave, tudo o mais funciona normalmente: você cadastra as questões à mão
+ou cola um lote pronto na aba "Importar".
+
+
+Se a janela não abrir de jeito nenhum
+--------------------------------------
+
+O programa avisa na tela o que faltou. O caso mais comum é o "WebView2", um
+componente gratuito da Microsoft que já vem no Windows 11 e na maioria dos
+Windows 10 — se estiver faltando, o próprio StudyIA abre a página de download.

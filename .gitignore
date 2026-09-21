@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local data (study database, may hold personal content)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Build output — publish the .exe files as GitHub Release assets instead
+build/
+*.spec
+executable/
+installer/
+dist/

@@ -1,0 +1,60 @@
+StudyIA — instalador
+=====================
+
+Dê dois cliques em StudyIA-Instalador.exe e siga o assistente.
+
+Ele instala o StudyIA só para o seu usuário: não pede senha de administrador
+e não mexe em nada do sistema. Cria um atalho no Menu Iniciar (e na Área de
+Trabalho, se você marcar a opção).
+
+
+"O Windows protegeu o seu PC" — e agora?
+-----------------------------------------
+
+Na primeira vez o Windows pode mostrar uma tela azul com esse aviso. Ele aparece
+para qualquer programa novo que ainda não é conhecido pela Microsoft — não quer
+dizer que tem vírus.
+
+Para continuar:
+
+    Clique em "Mais informações"  ->  "Executar assim mesmo"
+
+
+Como desinstalar
+-----------------
+
+Abra "Adicionar ou remover programas" do Windows, procure StudyIA e clique em
+Desinstalar. Ele vai perguntar se você quer apagar também suas questões e seu
+progresso — responda Não se pretende reinstalar depois e continuar de onde parou.
+
+
+Onde ficam minhas questões e meu progresso
+-------------------------------------------
+
+Num arquivo no seu computador:
+
+    %LOCALAPPDATA%\StudyIA\studyia.db
+
+Para fazer backup ou levar para outro computador, copie esse arquivo.
+(Cole esse caminho na barra do Explorador de Arquivos que ele abre a pasta.)
+Desinstalar o programa não apaga esse arquivo, a menos que você peça.
+Em Ajustes > Exportar backup você salva uma cópia dos seus estudos (sem a chave).
+
+
+Para gerar questões automaticamente (opcional)
+-----------------------------------------------
+
+Na aba "Gerar com IA" o programa pede uma chave do Google Gemini. É gratuita
+para uso leve:
+
+    1. Acesse  https://aistudio.google.com/apikey
+    2. Entre com sua conta Google e clique em criar chave
+    3. Copie e cole a chave na tela do StudyIA
+
+A chave fica guardada com a criptografia do Windows, presa à sua conta: ela não
+aparece de novo na tela e não vai junto se você copiar seus dados para outro
+computador. O texto que você pedir para gerar questões é enviado ao Google —
+não cole dados pessoais ou sigilosos.
+
+Sem a chave, tudo o mais funciona normalmente: você cadastra as questões à mão
+ou cola um lote pronto na aba "Importar".
