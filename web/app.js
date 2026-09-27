@@ -148,6 +148,7 @@ function aplicarTema(tema) {
 
 function switchView(name) {
   if (state.view === "study" && name !== "study") endSession();
+  if (state.view === "debate" && name !== "debate") pararFala();
   state.view = name;
   document.body.classList.toggle("studying", name === "study");   // esconde a lateral
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${name}`));
@@ -160,6 +161,7 @@ function switchView(name) {
   if (name === "manage") loadCards();
   if (name === "stats") loadStats();
   if (name === "ai") loadAiStatus();
+  if (name === "debate") loadDebate();
   if (name === "settings") loadSettings();
   if (name === "import") ensureDecks().then(fillDeckSelects);
   $("#content").scrollTop = 0;
@@ -1033,6 +1035,396 @@ function renderAiPreview() {
       toast(`${plural(out.imported, "questão adicionada", "questões adicionadas")}`, "ok");
       state.aiCards = [];
       renderAiPreview();
+      loadDecks();
+    } catch (err) { toast(err.message, "bad"); }
+  };
+}
+
+/* --------------------------------------------------------------------- debate */
+
+const LIMITE_DEBATE = 120000;   // igual ao do Python (app/debate.py)
+const deb = {
+  materialNome: "",       // nome do arquivo lido (vazio = texto colado)
+  temas: null,            // { resumo, temas: [...] } da última análise
+  atual: null,            // debate aberto (vem do banco)
+  ocupado: false,         // um pedido por vez
+  cards: [],              // questões sugeridas no resumo, com a marcação de cada uma
+};
+
+/* ---- voz: só vozes instaladas no Windows ----
+   `localService` separa as vozes do próprio computador das "online" do Edge, que mandam o
+   texto para a Microsoft. A fala da IA nunca sai do computador por aqui. */
+const voz = { ativa: false, nome: "", velocidade: 1 };
+
+function vozesLocais() {
+  if (!window.speechSynthesis) return [];
+  return speechSynthesis.getVoices().filter((v) => v.localService && /^pt/i.test(v.lang));
+}
+
+function falar(texto) {
+  if (!voz.ativa || !window.speechSynthesis) return;
+  const vozes = vozesLocais();
+  const escolhida = vozes.find((v) => v.name === voz.nome) || vozes.find((v) => /pt-BR/i.test(v.lang)) || vozes[0];
+  if (!escolhida) return;
+  speechSynthesis.cancel();
+  const fala = new SpeechSynthesisUtterance(texto);
+  fala.voice = escolhida;
+  fala.lang = escolhida.lang;
+  fala.rate = voz.velocidade;
+  speechSynthesis.speak(fala);
+}
+
+const pararFala = () => { if (window.speechSynthesis) speechSynthesis.cancel(); };
+const salvarVoz = () => api("/api/settings", { method: "POST", body: { voz: { ...voz } } }).catch(() => {});
+
+function controlesDeVoz() {
+  const vozes = vozesLocais();
+  if (!vozes.length) {
+    return `<span class="muted small-text voz-aviso" title="Configurações do Windows → Hora e idioma → Fala → Adicionar vozes">${ico("mute")} Sem voz em português instalada no Windows</span>`;
+  }
+  const opcoes = vozes.map((v) => `<option value="${esc(v.name)}" ${v.name === voz.nome ? "selected" : ""}>${esc(v.name.replace(/^Microsoft /, "").replace(/ - .*$/, ""))}</option>`).join("");
+  const velocidades = [0.8, 1, 1.2, 1.4].map((x) => `<option value="${x}" ${x === voz.velocidade ? "selected" : ""}>${String(x).replace(".", ",")}×</option>`).join("");
+  return `<div class="inline voz">
+      <button class="btn small ${voz.ativa ? "primary" : ""}" id="btn-voz" aria-pressed="${voz.ativa}">
+        ${ico(voz.ativa ? "volume" : "mute")}<span>${voz.ativa ? "Voz ligada" : "Voz desligada"}</span></button>
+      <select id="voz-nome" aria-label="Voz" ${voz.ativa ? "" : "disabled"}>${opcoes}</select>
+      <select id="voz-velocidade" aria-label="Velocidade da fala" ${voz.ativa ? "" : "disabled"}>${velocidades}</select>
+    </div>`;
+}
+
+function ligarControlesDeVoz() {
+  const botao = $("#btn-voz");
+  if (!botao) return;
+  botao.onclick = () => {
+    voz.ativa = !voz.ativa;
+    if (!voz.ativa) pararFala();
+    salvarVoz();
+    $("#debate-voz").innerHTML = controlesDeVoz();
+    ligarControlesDeVoz();
+    if (voz.ativa) {                       // ao ligar, lê a última fala da IA
+      const ultima = [...(deb.atual?.mensagens || [])].reverse().find((m) => m.papel === "ia");
+      if (ultima) falar(ultima.texto);
+    }
+  };
+  $("#voz-nome").onchange = (e) => { voz.nome = e.target.value; salvarVoz(); };
+  $("#voz-velocidade").onchange = (e) => { voz.velocidade = +e.target.value; salvarVoz(); };
+}
+
+// As vozes do Windows chegam de forma assíncrona; quando chegam, redesenha os controles.
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => {
+    if ($("#debate-voz")) { $("#debate-voz").innerHTML = controlesDeVoz(); ligarControlesDeVoz(); }
+  };
+}
+
+/* ---- etapas ---- */
+
+function mostrarEtapa(etapa) {
+  $("#debate-etapa-material").hidden = etapa !== "material";
+  $("#debate-palco").hidden = etapa === "material";
+  if (etapa === "material") $("#debate-palco").innerHTML = "";   // nada de telas velhas escondidas
+  $("#debate-actions").innerHTML = etapa === "material" ? ""
+    : `<button class="btn ghost" id="btn-debate-voltar">${ico("back")}<span>Outro material</span></button>`;
+  if (etapa !== "material") $("#btn-debate-voltar").onclick = () => { pararFala(); deb.atual = null; mostrarEtapa("material"); carregarRecentes(); };
+  $("#content").scrollTop = 0;
+}
+
+async function loadDebate() {
+  try {
+    const s = await api("/api/settings");
+    Object.assign(voz, { ativa: false, nome: "", velocidade: 1 }, s.voz || {});
+  } catch { /* segue com a voz desligada */ }
+  const st = await api("/api/ai/status");
+  $("#debate-aviso-chave").innerHTML = st.configured ? "" : `
+    <div class="card notice warn" style="margin-bottom:16px">${ico("lock")}
+      <span><b>Falta a chave do Gemini.</b> O debate usa a mesma chave da geração de questões.
+      <a href="#" id="link-chave-debate">Configurar na aba Gerar com IA</a>.</span></div>`;
+  if ($("#link-chave-debate")) $("#link-chave-debate").onclick = (e) => { e.preventDefault(); switchView("ai"); };
+  if (deb.atual) return abrirConversa(deb.atual);
+  if (deb.temas) return mostrarTemas();
+  mostrarEtapa("material");
+  atualizarContadorDebate();
+  carregarRecentes();
+}
+
+function atualizarContadorDebate() {
+  const n = $("#debate-material").value.length;
+  const acima = n > LIMITE_DEBATE;
+  const cont = $("#debate-count");
+  cont.textContent = n ? `${n.toLocaleString("pt-BR")} de ${LIMITE_DEBATE.toLocaleString("pt-BR")} caracteres${acima ? " — use uma parte do material por vez" : ""}` : "";
+  cont.classList.toggle("over", acima);
+  $("#btn-debate-temas").disabled = deb.ocupado || acima || !n;
+}
+$("#debate-material").addEventListener("input", () => {
+  deb.materialNome = "";
+  $("#debate-material-nome").textContent = "";
+  atualizarContadorDebate();
+});
+
+function erroDebate(texto, tipo = "error") {
+  const alvo = $("#debate-palco").hidden ? $("#debate-erro") : ($("#debate-erro-palco") || $("#debate-erro"));
+  alvo.innerHTML = texto ? `<div class="notice ${tipo}">${ico(tipo === "error" ? "x" : "shield")}<span>${esc(texto)}</span></div>` : "";
+}
+
+// Um pedido por vez; o status mostra os segundos para a espera não parecer travamento.
+async function comEspera(rotulo, alvoStatus, trabalho) {
+  if (deb.ocupado) return null;
+  deb.ocupado = true;
+  erroDebate("");
+  const inicio = Date.now();
+  const tick = () => { if (alvoStatus) alvoStatus.innerHTML = `<span class="spinner"></span> ${esc(rotulo)} ${Math.round((Date.now() - inicio) / 1000)}s`; };
+  tick();
+  const relogio = setInterval(tick, 1000);
+  try {
+    return await trabalho();
+  } catch (err) {
+    erroDebate(err.message);
+    return null;
+  } finally {
+    clearInterval(relogio);
+    if (alvoStatus) alvoStatus.textContent = "";
+    deb.ocupado = false;
+    if (!$("#debate-etapa-material").hidden) atualizarContadorDebate();
+  }
+}
+
+/* ---- 1. material ---- */
+
+const zonaDebate = $("#debate-drop");
+["dragenter", "dragover"].forEach((ev) => zonaDebate.addEventListener(ev, (e) => { e.preventDefault(); zonaDebate.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => zonaDebate.addEventListener(ev, () => zonaDebate.classList.remove("over")));
+zonaDebate.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) lerMaterial(f); });
+$("#debate-file").onchange = (e) => { const f = e.target.files[0]; if (f) lerMaterial(f); e.target.value = ""; };
+
+function paraBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binario = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binario);
+}
+
+async function lerMaterial(file) {
+  if (file.size > 15 * 1024 * 1024) return erroDebate("Arquivo grande demais (limite de 15 MB).");
+  erroDebate("");
+  try {
+    // PDF e Word são lidos pelo Python, aqui no computador; nada vai para a rede nesta etapa.
+    const lido = await api("/api/debate/ler", { method: "POST", body: { nome: file.name, dados: paraBase64(await file.arrayBuffer()) } });
+    $("#debate-material").value = lido.texto;
+    deb.materialNome = lido.nome;
+    $("#debate-material-nome").textContent = `· ${lido.nome}`;
+    atualizarContadorDebate();
+    toast(`"${file.name}" lido: ${lido.caracteres.toLocaleString("pt-BR")} caracteres`, "ok");
+  } catch (err) { erroDebate(err.message); }
+}
+
+$("#btn-debate-temas").onclick = async () => {
+  const material = $("#debate-material").value;
+  const res = await comEspera("Lendo o material e procurando os temas…", $("#debate-status"),
+    () => api("/api/debate/temas", { method: "POST", body: { material } }));
+  if (!res) return;
+  deb.temas = res;
+  mostrarTemas();
+};
+
+async function carregarRecentes() {
+  const lista = await api("/api/debate").catch(() => []);
+  const el = $("#debate-recentes");
+  if (!lista.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<h3 class="section-title">Debates recentes</h3>
+    <div class="card-list">${lista.map((d) => `
+      <div class="card-item">
+        <div style="flex:1;min-width:0">
+          <div class="q">${esc(d.titulo)}</div>
+          <div class="meta">
+            <span class="badge ${d.encerrado ? "review" : "learning"}">${d.encerrado ? "encerrado" : "em andamento"}</span>
+            <span>${plural(d.mensagens_total, "mensagem", "mensagens")}</span>
+            ${d.material ? `<span>${ico("file")} ${esc(d.material)}</span>` : ""}
+          </div>
+        </div>
+        <div class="inline" style="flex:none">
+          <button class="btn small" data-abrir-debate="${d.id}">${d.encerrado ? "Ver" : "Continuar"}</button>
+          <button class="btn icon danger" data-apagar-debate="${d.id}" title="Apagar" aria-label="Apagar debate">${ico("trash")}</button>
+        </div>
+      </div>`).join("")}</div>`;
+  $$("[data-abrir-debate]", el).forEach((b) => b.onclick = async () => abrirConversa(await api(`/api/debate/${b.dataset.abrirDebate}`)));
+  $$("[data-apagar-debate]", el).forEach((b) => b.onclick = async () => {
+    if (!await confirmar("Apagar este debate?", "A conversa e o resumo serão apagados. As questões que você já adicionou aos baralhos continuam lá.", { ok: "Apagar", perigo: true })) return;
+    await api(`/api/debate/${b.dataset.apagarDebate}`, { method: "DELETE" });
+    carregarRecentes();
+  });
+}
+
+/* ---- 2. temas ---- */
+
+function mostrarTemas() {
+  mostrarEtapa("temas");
+  const { resumo, temas } = deb.temas;
+  $("#debate-palco").innerHTML = `
+    ${resumo ? `<p class="debate-resumo-material">${esc(resumo)}</p>` : ""}
+    <h3 class="section-title" style="margin-top:0">Escolha um tema para debater</h3>
+    <div id="debate-erro-palco" role="alert"></div>
+    <div class="tema-grid">${temas.map((t, i) => `
+      <div class="card tema">
+        <h3>${esc(t.titulo)}</h3>
+        <p class="muted">${esc(t.resumo)}</p>
+        <blockquote class="tese">${esc(t.tese)}</blockquote>
+        <div class="actions" style="margin-top:auto">
+          <button class="btn primary small" data-debater="${i}">${ico("chat")}<span>Debater este tema</span></button>
+          <span class="muted small-text" data-status-tema="${i}"></span>
+        </div>
+      </div>`).join("")}</div>`;
+  $$("[data-debater]").forEach((b) => b.onclick = async () => {
+    const i = +b.dataset.debater;
+    const debate = await comEspera("Preparando a abertura…", $(`[data-status-tema="${i}"]`),
+      () => api("/api/debate", { method: "POST", body: { tema: temas[i], material: deb.materialNome || "texto colado" } }));
+    if (debate) abrirConversa(debate, true);
+  });
+}
+
+/* ---- 3. conversa ---- */
+
+function bolhaHTML(m, i) {
+  if (m.papel === "ia") {
+    return `<div class="msg ia"><div class="bolha">${esc(m.texto)}</div>
+      <button class="icon-btn ouvir" data-ouvir="${i}" title="Ouvir" aria-label="Ouvir esta fala">${ico("volume")}</button></div>`;
+  }
+  return `<div class="msg eu"><div class="bolha">${esc(m.texto)}</div>
+    ${m.lacuna ? `<div class="lacuna">${ico("flag")}<span>${esc(m.lacuna)}</span></div>` : ""}</div>`;
+}
+
+function abrirConversa(debate, falarAbertura = false) {
+  deb.atual = debate;
+  mostrarEtapa("conversa");
+  const t = debate.tema;
+  $("#debate-palco").innerHTML = `
+    <div class="card debate-cabeca">
+      <div style="min-width:0">
+        <h2>${esc(t.titulo)}</h2>
+        <blockquote class="tese">${esc(t.tese)}</blockquote>
+      </div>
+      <div id="debate-voz"></div>
+    </div>
+    <div class="chat" id="debate-chat" role="log" aria-live="polite">${debate.mensagens.map(bolhaHTML).join("")}</div>
+    <div id="debate-erro-palco" role="alert"></div>
+    <div id="debate-fim"></div>`;
+  $("#debate-voz").innerHTML = controlesDeVoz();
+  ligarControlesDeVoz();
+  ligarOuvir();
+
+  if (debate.resumo) return mostrarResumo(debate.resumo);
+
+  $("#debate-fim").innerHTML = `
+    <div class="card composer">
+      <textarea id="debate-resposta" rows="3" maxlength="2000" placeholder="Defenda seu ponto, discorde, dê um exemplo…"></textarea>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn primary" id="btn-debate-enviar">${ico("send")}<span>Responder</span></button>
+        <span class="muted small-text"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> envia</span>
+        <span class="muted" id="debate-status-chat" role="status"></span>
+        <button class="btn ghost" id="btn-debate-encerrar" style="margin-left:auto">${ico("flag")}<span>Encerrar e ver resumo</span></button>
+      </div>
+    </div>`;
+  const campo = $("#debate-resposta");
+  campo.onkeydown = (e) => { if (e.key === "Enter" && e.ctrlKey) { e.preventDefault(); enviarResposta(); } };
+  $("#btn-debate-enviar").onclick = enviarResposta;
+  $("#btn-debate-encerrar").onclick = encerrarDebate;
+  rolarChat();
+  campo.focus();
+  if (falarAbertura) falar(debate.mensagens[0]?.texto || "");
+}
+
+function ligarOuvir() {
+  $$("[data-ouvir]").forEach((b) => b.onclick = () => {
+    const texto = deb.atual.mensagens[+b.dataset.ouvir].texto;
+    if (!voz.ativa) {                     // ouvir uma fala não liga a voz para sempre
+      const antes = voz.ativa; voz.ativa = true; falar(texto); voz.ativa = antes;
+    } else falar(texto);
+  });
+}
+
+const rolarChat = () => { const c = $("#content"); c.scrollTop = c.scrollHeight; };
+
+async function enviarResposta() {
+  const campo = $("#debate-resposta");
+  const texto = campo.value.trim();
+  if (!texto || deb.ocupado) return;
+  pararFala();
+  // mostra a resposta na hora, com a IA "pensando"; se o pedido falhar, ela volta para o campo
+  const chat = $("#debate-chat");
+  chat.insertAdjacentHTML("beforeend", `<div class="msg eu pendente"><div class="bolha">${esc(texto)}</div></div>
+    <div class="msg ia pendente"><div class="bolha digitando"><span></span><span></span><span></span></div></div>`);
+  campo.value = "";
+  campo.disabled = true;
+  $("#btn-debate-enviar").disabled = $("#btn-debate-encerrar").disabled = true;
+  rolarChat();
+
+  const debate = await comEspera("", null,
+    () => api(`/api/debate/${deb.atual.id}/responder`, { method: "POST", body: { mensagem: texto } }));
+  $$(".msg.pendente", chat).forEach((el) => el.remove());
+  campo.disabled = false;
+  $("#btn-debate-enviar").disabled = $("#btn-debate-encerrar").disabled = false;
+  if (!debate) { campo.value = texto; campo.focus(); return; }
+
+  deb.atual = debate;
+  chat.innerHTML = debate.mensagens.map(bolhaHTML).join("");
+  ligarOuvir();
+  rolarChat();
+  campo.focus();
+  falar(debate.mensagens[debate.mensagens.length - 1].texto);
+}
+
+async function encerrarDebate() {
+  pararFala();
+  const debate = await comEspera("Avaliando o debate e montando as questões…", $("#debate-status-chat"),
+    () => api(`/api/debate/${deb.atual.id}/encerrar`, { method: "POST" }));
+  if (debate) abrirConversa(debate);
+}
+
+/* ---- 4. resumo ---- */
+
+function mostrarResumo(resumo) {
+  deb.cards = (resumo.cards || []).map((c) => ({ ...c, marcada: true }));
+  const lista = (itens, cls, icone) => itens.length
+    ? `<ul class="avaliacao ${cls}">${itens.map((x) => `<li>${ico(icone)}<span>${esc(x)}</span></li>`).join("")}</ul>`
+    : `<p class="muted small-text">Nada a destacar.</p>`;
+  $("#debate-fim").innerHTML = `
+    <div class="grid-2 debate-avaliacao">
+      <div class="card"><h3>O que você dominou</h3>${lista(resumo.dominou || [], "ok", "check")}</div>
+      <div class="card"><h3>O que revisar</h3>${lista(resumo.revisar || [], "bad", "flag")}</div>
+    </div>
+    <div id="debate-cards"></div>`;
+  renderCardsDoDebate();
+  rolarChat();
+}
+
+function renderCardsDoDebate() {
+  const el = $("#debate-cards");
+  if (!deb.cards.length) { el.innerHTML = ""; return; }
+  const marcadas = deb.cards.filter((c) => c.marcada).length;
+  const opts = state.decks.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
+  el.innerHTML = `
+    <div class="row-between" style="margin-top:22px">
+      <h3 style="margin:0">Questões para revisar o que faltou <span class="muted">· ${marcadas} selecionada${marcadas === 1 ? "" : "s"}</span></h3>
+    </div>
+    <div class="card-list">${deb.cards.map((c, i) => cardPreviewHTML(c, { indice: i, marcada: c.marcada })).join("")}</div>
+    <div class="card form" style="margin-top:14px">
+      <div class="inline">
+        <select id="debate-deck">${opts}<option value="" ${opts ? "" : "selected"}>— criar novo —</option></select>
+        <input id="debate-deck-new" placeholder="Nome do novo baralho" style="flex:1;min-width:180px" autocomplete="off">
+        <button class="btn primary" id="btn-debate-salvar" ${marcadas ? "" : "disabled"}>Adicionar ${marcadas} ao baralho</button>
+      </div>
+    </div>`;
+  $$("[data-pick]", el).forEach((cb) => cb.onchange = () => { deb.cards[+cb.dataset.pick].marcada = cb.checked; renderCardsDoDebate(); });
+  $("#debate-deck-new").oninput = (e) => { if (e.target.value.trim()) $("#debate-deck").value = ""; };
+  $("#btn-debate-salvar").onclick = async () => {
+    try {
+      const escolhidas = deb.cards.filter((c) => c.marcada).map(({ marcada, ...c }) => c);
+      const out = await api("/api/import", { method: "POST", body: {
+        deck_id: +$("#debate-deck").value || null,
+        deck_name: $("#debate-deck-new").value.trim(),
+        cards: escolhidas } });
+      toast(`${plural(out.imported, "questão adicionada", "questões adicionadas")}`, "ok");
+      deb.cards = [];
+      renderCardsDoDebate();
       loadDecks();
     } catch (err) { toast(err.message, "bad"); }
   };

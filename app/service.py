@@ -10,7 +10,7 @@ import json
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 
-from . import __version__, ai, cofre, importer
+from . import __version__, ai, cofre, debate, importer
 from .db import db, depurar_arquivo, get_setting, now_iso, set_setting
 from .srs import SchedState, apply_grade, due_from, humanize, preview
 
@@ -603,18 +603,141 @@ def save_model(model: str = "") -> dict:
     return {"ok": True}
 
 
-def ai_generate(material: str = "", n: int = 10, kind: str = "quiz",
-                difficulty: str = "médio", notes: str = "") -> dict:
+def _chave_e_modelo() -> tuple[str, str]:
     with db() as conn:
         guardada, _ = _chave_guardada(conn)
         model = get_setting(conn, "ai_model", ai.DEFAULT_MODEL)
     _depurar_se_preciso()
+    return guardada, model
+
+
+def ai_generate(material: str = "", n: int = 10, kind: str = "quiz",
+                difficulty: str = "médio", notes: str = "") -> dict:
+    guardada, model = _chave_e_modelo()
     try:
         # um único pedido; devolve {"cards": [...], "aviso": texto ou None}
         return ai.generate(material=material, n=n, kind=kind, difficulty=difficulty,
                            notes=notes, api_key=guardada, model=model)
     except RuntimeError as exc:
         raise AppError(str(exc))
+
+
+# -------------------------------------------------------------------------- debate
+
+def _debate_dict(row: sqlite3.Row, completo: bool = True) -> dict:
+    tema = json.loads(row["tema"])
+    mensagens = json.loads(row["mensagens"] or "[]")
+    dados = {
+        "id": row["id"],
+        "material": row["material"],
+        "titulo": tema.get("titulo", ""),
+        "mensagens_total": len(mensagens),
+        "encerrado": row["resumo"] is not None,
+        "updated_at": row["updated_at"],
+    }
+    if completo:
+        dados.update(tema=tema, mensagens=mensagens,
+                     resumo=json.loads(row["resumo"]) if row["resumo"] else None)
+    return dados
+
+
+def _debate_row(conn, debate_id: int) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM debate WHERE id = ?", (debate_id,)).fetchone()
+    if not row:
+        raise AppError("Debate não encontrado.")
+    return row
+
+
+def _na_ia(funcao, *args):
+    guardada, model = _chave_e_modelo()
+    try:
+        return funcao(*args, api_key=guardada, model=model)
+    except RuntimeError as exc:
+        raise AppError(str(exc))
+
+
+def debate_ler_arquivo(nome: str = "", dados: str = "") -> dict:
+    try:
+        return debate.ler_arquivo(nome, dados)
+    except debate.ErroDeLeitura as exc:
+        raise AppError(str(exc))
+
+
+def debate_temas(material: str = "") -> dict:
+    return _na_ia(debate.temas, material)
+
+
+def debate_iniciar(tema: dict | None = None, material: str = "") -> dict:
+    """Cria o debate já com a fala de abertura da IA (um pedido)."""
+    if not tema or not str(tema.get("titulo", "")).strip():
+        raise AppError("Escolha um tema para debater.")
+    tema = {k: tema.get(k) for k in ("titulo", "resumo", "tese", "pontos")}
+    abertura = _na_ia(debate.turno, tema, [])
+    mensagens = [{"papel": "ia", "texto": abertura["fala"], "lacuna": ""}]
+    agora = now_iso()
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO debate (material, tema, mensagens, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            ((material or "").strip()[:200], json.dumps(tema, ensure_ascii=False),
+             json.dumps(mensagens, ensure_ascii=False), agora, agora))
+        return _debate_dict(_debate_row(conn, cur.lastrowid))
+
+
+def debate_responder(debate_id: int, mensagem: str = "") -> dict:
+    """Grava a resposta do estudante e a réplica da IA juntas — se o pedido falhar, nada é
+    gravado e o estudante pode reenviar o mesmo texto."""
+    texto = (mensagem or "").strip()
+    if not texto:
+        raise AppError("Escreva sua resposta primeiro.")
+    if len(texto) > debate.MAX_MENSAGEM:
+        raise AppError(f"Resposta longa demais (limite de {debate.MAX_MENSAGEM} caracteres). "
+                       "Divida o argumento em partes.")
+    with db() as conn:
+        row = _debate_row(conn, debate_id)
+    if row["resumo"] is not None:
+        raise AppError("Esse debate já foi encerrado.")
+    tema = json.loads(row["tema"])
+    mensagens = json.loads(row["mensagens"] or "[]") + [{"papel": "estudante", "texto": texto, "lacuna": ""}]
+
+    replica = _na_ia(debate.turno, tema, mensagens)
+    mensagens[-1]["lacuna"] = replica["lacuna"]      # a falha é da resposta do estudante
+    mensagens.append({"papel": "ia", "texto": replica["fala"], "lacuna": ""})
+    with db() as conn:
+        conn.execute("UPDATE debate SET mensagens = ?, updated_at = ? WHERE id = ?",
+                     (json.dumps(mensagens, ensure_ascii=False), now_iso(), debate_id))
+        return _debate_dict(_debate_row(conn, debate_id))
+
+
+def debate_encerrar(debate_id: int) -> dict:
+    with db() as conn:
+        row = _debate_row(conn, debate_id)
+    if row["resumo"] is not None:
+        return _debate_dict(row)
+    mensagens = json.loads(row["mensagens"] or "[]")
+    if not any(m.get("papel") == "estudante" for m in mensagens):
+        raise AppError("Responda pelo menos uma vez antes de encerrar — sem isso não há o que avaliar.")
+    avaliacao = _na_ia(debate.resumo, json.loads(row["tema"]), mensagens)
+    with db() as conn:
+        conn.execute("UPDATE debate SET resumo = ?, updated_at = ? WHERE id = ?",
+                     (json.dumps(avaliacao, ensure_ascii=False), now_iso(), debate_id))
+        return _debate_dict(_debate_row(conn, debate_id))
+
+
+def debate_listar() -> list[dict]:
+    with db() as conn:
+        rows = conn.execute("SELECT * FROM debate ORDER BY updated_at DESC, id DESC LIMIT 20").fetchall()
+    return [_debate_dict(r, completo=False) for r in rows]
+
+
+def debate_abrir(debate_id: int) -> dict:
+    with db() as conn:
+        return _debate_dict(_debate_row(conn, debate_id))
+
+
+def debate_apagar(debate_id: int) -> dict:
+    with db() as conn:
+        conn.execute("DELETE FROM debate WHERE id = ?", (debate_id,))
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------------- ajustes
@@ -627,15 +750,32 @@ def get_settings() -> dict:
 
     with db() as conn:
         tema = get_setting(conn, "theme", "auto")
+        voz = get_setting(conn, "voz", "")
+    try:
+        voz = json.loads(voz) if voz else {}
+    except ValueError:
+        voz = {}
     return {"theme": tema if tema in TEMAS else "auto", "version": __version__,
-            "data_dir": str(data_dir())}
+            "data_dir": str(data_dir()), "voz": voz}
 
 
-def save_settings(theme: str = "auto") -> dict:
-    if theme not in TEMAS:
+def save_settings(theme: str | None = None, voz: dict | None = None) -> dict:
+    """Grava só o que veio: salvar a voz não pode mexer no tema, e vice-versa."""
+    if theme is not None and theme not in TEMAS:
         raise AppError("Tema desconhecido")
     with db() as conn:
-        set_setting(conn, "theme", theme)
+        if theme is not None:
+            set_setting(conn, "theme", theme)
+        if voz is not None:
+            velocidade = voz.get("velocidade", 1)
+            if not isinstance(velocidade, (int, float)):
+                velocidade = 1.0
+            limpa = {
+                "ativa": bool(voz.get("ativa")),
+                "nome": str(voz.get("nome") or "")[:200],
+                "velocidade": min(2.0, max(0.5, float(velocidade))),
+            }
+            set_setting(conn, "voz", json.dumps(limpa, ensure_ascii=False))
     return {"ok": True}
 
 

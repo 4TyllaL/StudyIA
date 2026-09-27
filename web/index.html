@@ -43,6 +43,11 @@
     <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></symbol>
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5h4l1.5 3h6l1.5-3h4"/><path d="M5.5 5.5h13l2 8v5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18.5v-5l2-8Z"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H11l-4.5 3.5V16h0a2 2 0 0 1-2-2V6.5Z"/><path d="M8.5 9h7M8.5 12h4.5"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3v-5Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3v-5Z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4.5 12 20 4.5 15.5 20l-3-6.5L4.5 12Z"/><path d="m12.5 13.5 3-3"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4.5"/><path d="M5.5 5h11l-2 4 2 4h-11"/></symbol>
   </defs>
 </svg>
 
@@ -60,6 +65,7 @@
       <button class="nav-item" data-view="manage"><svg class="ico"><use href="#i-list"/></svg><span>Questões</span></button>
       <button class="nav-item" data-view="import"><svg class="ico"><use href="#i-upload"/></svg><span>Importar</span></button>
       <button class="nav-item" data-view="ai"><svg class="ico"><use href="#i-sparkles"/></svg><span>Gerar com IA</span></button>
+      <button class="nav-item" data-view="debate"><svg class="ico"><use href="#i-chat"/></svg><span>Debater</span></button>
       <button class="nav-item" data-view="stats"><svg class="ico"><use href="#i-chart"/></svg><span>Progresso</span></button>
     </nav>
 
@@ -306,6 +312,47 @@
     </div>
 
     <div id="ai-preview"></div>
+  </section>
+
+  <!-- ============================================================ DEBATE -->
+  <section id="view-debate" class="view">
+    <header class="page-head">
+      <div>
+        <h1>Debater com a IA</h1>
+        <p class="page-sub">Envie seu material: a IA encontra os temas centrais e debate com você — ela contesta, pede justificativa e aponta o que faltou. No fim, o que você errou vira questão para revisar.</p>
+      </div>
+      <div class="page-actions" id="debate-actions"></div>
+    </header>
+
+    <div id="debate-aviso-chave"></div>
+
+    <!-- 1. material -->
+    <div id="debate-etapa-material">
+      <div class="card form">
+        <div class="dropzone" id="debate-drop">
+          <span class="drop-ico"><svg class="ico big"><use href="#i-file"/></svg></span>
+          <div><b>Arraste o material para cá</b> <span class="muted">ou</span></div>
+          <label class="btn small" for="debate-file">Escolher arquivo…</label>
+          <input type="file" id="debate-file" accept=".pdf,.docx,.txt,.md,.markdown" hidden>
+          <div class="muted small-text">PDF · Word (.docx) · .txt · .md</div>
+        </div>
+        <div class="field">
+          <label for="debate-material">Ou cole o texto <span class="muted" id="debate-material-nome"></span></label>
+          <textarea id="debate-material" rows="7" placeholder="Cole aqui o capítulo, o resumo ou o texto da lei…"></textarea>
+          <div class="counter" id="debate-count" aria-live="polite"></div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btn-debate-temas"><svg class="ico"><use href="#i-sparkles"/></svg><span>Encontrar os temas</span></button>
+          <span class="muted" id="debate-status" role="status"></span>
+        </div>
+        <div id="debate-erro" role="alert"></div>
+        <p class="notice"><svg class="ico"><use href="#i-shield"/></svg><span>O arquivo é lido aqui no computador; só o texto extraído vai para o Google (Gemini). Cada fala do debate leva só o tema escolhido, não o material inteiro. Evite dados pessoais ou sigilosos.</span></p>
+      </div>
+      <div id="debate-recentes"></div>
+    </div>
+
+    <!-- 2. temas, 3. conversa e 4. resumo são montados pelo app.js -->
+    <div id="debate-palco"></div>
   </section>
 
   <!-- ========================================================= PROGRESSO -->

@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS review (
 CREATE INDEX IF NOT EXISTS idx_review_card ON review(card_id);
 CREATE INDEX IF NOT EXISTS idx_review_when ON review(reviewed_at);
 
+CREATE TABLE IF NOT EXISTS debate (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    material    TEXT NOT NULL DEFAULT '',     -- nome do arquivo (ou "texto colado")
+    tema        TEXT NOT NULL,                -- JSON: titulo, resumo, tese, pontos
+    mensagens   TEXT NOT NULL DEFAULT '[]',   -- JSON: [{papel, texto, lacuna}]
+    resumo      TEXT,                         -- JSON quando encerrado
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS setting (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

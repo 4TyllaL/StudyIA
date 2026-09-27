@@ -189,15 +189,73 @@ def _config_geracao(model: str, n: int) -> dict:
     Gerar questões a partir de um texto que já está no pedido não precisa de raciocínio
     longo — e o raciocínio conta contra o teto de saída: com teto alto e raciocínio
     "solto", o modelo gasta tempo (e tokens cobrados) pensando antes de escrever.
-    `thinking_level` só existe nos modelos 3.x; enviá-lo a um 2.5 daria erro.
     """
-    config = {"max_output_tokens": min(16_000, 3_000 + 700 * n)}
-    if model.startswith("gemini-3"):
-        # "minimal" é dos modelos flash; os Pro só aceitam níveis mais altos, então usam "low".
-        # (Baseado na documentação — não pude confirmar com a API real, por isso o "low"
-        # como escolha conservadora fora dos flash.)
-        config["thinking_level"] = "minimal" if "flash" in model else "low"
-    return config
+    return {"max_output_tokens": min(16_000, 3_000 + 700 * n), **_raciocinio(model)}
+
+
+def _raciocinio(model: str) -> dict:
+    """`thinking_level` só existe nos modelos 3.x; enviá-lo a um 2.5 daria erro.
+
+    "low" é o menor nível aceito por todos os 3.x: "minimal" parecia valer para os flash, mas
+    o gemini-3.8-flash recusa (erro 400 visto com a API real). Se algum modelo recusar mesmo
+    assim, `_criar` tenta de novo sem o nível.
+    """
+    if model.startswith("gemini-3") and model not in _sem_nivel_de_raciocinio:
+        return {"thinking_level": "low"}
+    return {}
+
+
+# Modelos que recusaram `thinking_level` nesta sessão: não adianta mandar de novo.
+_sem_nivel_de_raciocinio: set[str] = set()
+
+
+def _criar(client, modelo: str, generation_config: dict, **kwargs):
+    """`interactions.create` que sobrevive a um modelo que recuse o nível de raciocínio.
+
+    É a única exceção ao "um pedido por clique": um pedido recusado com 400 não gera nada
+    nem é cobrado, e o segundo vai sem o nível. O modelo fica anotado, então isso acontece
+    no máximo uma vez por modelo.
+    """
+    try:
+        return client.interactions.create(model=modelo, generation_config=generation_config, **kwargs)
+    except Exception as exc:
+        recusou_nivel = "thinking_level" in generation_config and "thinking level" in str(exc).lower()
+        if not recusou_nivel:
+            raise
+    _sem_nivel_de_raciocinio.add(modelo)
+    sem_nivel = {k: v for k, v in generation_config.items() if k != "thinking_level"}
+    return client.interactions.create(model=modelo, generation_config=sem_nivel, **kwargs)
+
+
+def pedir_json(*, system: str, entrada: str, schema: dict, max_tokens: int,
+               api_key: str = "", model: str = "") -> dict:
+    """Um pedido com resposta JSON estruturada — o mesmo cuidado de `generate` (um pedido só,
+    timeout, erro com o motivo), para quem não precisa de aproveitar resposta cortada."""
+    client = _client(api_key)
+    modelo = model or DEFAULT_MODEL
+    try:
+        interaction = _criar(
+            client, modelo, {"max_output_tokens": max_tokens, **_raciocinio(modelo)},
+            system_instruction=system,
+            input=entrada,
+            response_format={"type": "text", "mime_type": "application/json", "schema": schema},
+        )
+    except Exception as exc:
+        raise RuntimeError(_mensagem_de_erro(exc, modelo)) from exc
+
+    texto = _texto_da_resposta(interaction)
+    status = getattr(interaction, "status", "") or ""
+    if status == "incomplete":
+        raise RuntimeError("A resposta do Gemini foi cortada antes de terminar. Tente de novo.")
+    if status not in ("completed", "") or not texto:
+        raise RuntimeError(_mensagem_de_status(interaction, texto))
+    try:
+        dados = json.loads(texto)
+    except ValueError:
+        raise RuntimeError("A resposta do Gemini não veio no formato esperado. Tente de novo.") from None
+    if not isinstance(dados, dict):
+        raise RuntimeError("A resposta do Gemini não veio no formato esperado. Tente de novo.")
+    return dados
 
 
 # ------------------------------------------------------------ leitura da resposta
@@ -299,8 +357,8 @@ def generate(
     modelo = model or DEFAULT_MODEL
 
     try:
-        interaction = client.interactions.create(
-            model=modelo,
+        interaction = _criar(
+            client, modelo, _config_geracao(modelo, n),
             system_instruction=SYSTEM,
             input=_build_prompt(material, n, kind, difficulty, notes),
             response_format={
@@ -308,7 +366,6 @@ def generate(
                 "mime_type": "application/json",
                 "schema": RESPONSE_SCHEMA,
             },
-            generation_config=_config_geracao(modelo, n),
         )
     except Exception as exc:
         raise RuntimeError(_mensagem_de_erro(exc, modelo)) from exc

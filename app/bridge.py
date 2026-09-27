@@ -55,6 +55,15 @@ ROTAS: list[tuple[str, re.Pattern[str], object]] = [
     ("POST", r"/api/ai/key", service.save_key),
     ("POST", r"/api/ai/model", service.save_model),
     ("POST", r"/api/ai/generate", service.ai_generate),
+
+    ("POST", r"/api/debate/ler", service.debate_ler_arquivo),
+    ("POST", r"/api/debate/temas", service.debate_temas),
+    ("GET", r"/api/debate", service.debate_listar),
+    ("POST", r"/api/debate", service.debate_iniciar),
+    ("GET", r"/api/debate/(?P<debate_id>\d+)", service.debate_abrir),
+    ("DELETE", r"/api/debate/(?P<debate_id>\d+)", service.debate_apagar),
+    ("POST", r"/api/debate/(?P<debate_id>\d+)/responder", service.debate_responder),
+    ("POST", r"/api/debate/(?P<debate_id>\d+)/encerrar", service.debate_encerrar),
 ]
 ROTAS = [(m, re.compile(f"^{p}$"), f) for m, p, f in ROTAS]  # type: ignore[misc]
 

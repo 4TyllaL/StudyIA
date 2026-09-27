@@ -291,7 +291,7 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 .segmented button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); font-weight: 600; }
 
 /* =============================================================== início ==== */
-.summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+.summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); margin-bottom: var(--s4); }
 .stat {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   padding: var(--s4) var(--s4) var(--s3); box-shadow: var(--shadow-sm);
@@ -623,3 +623,60 @@ dialog::backdrop { background: rgba(4, 7, 12, .58); backdrop-filter: blur(2px); 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* ================================================================ debate ==== */
+.debate-resumo-material { color: var(--text-2); max-width: 80ch; margin: 0 0 var(--s5); }
+.tema-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s3); }
+.tema { display: flex; flex-direction: column; gap: var(--s2); }
+.tema h3 { margin: 0; }
+.tema p { margin: 0; font-size: 13px; line-height: 1.5; }
+.tese {
+  margin: var(--s1) 0 0; padding: var(--s2) var(--s3); border-left: 3px solid var(--accent);
+  background: var(--accent-soft); border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  font-style: italic; color: var(--text); font-size: 13.5px; line-height: 1.5;
+}
+.debate-cabeca { display: flex; gap: var(--s4); align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.debate-cabeca h2 { margin: 0 0 var(--s2); font-size: 18px; }
+.debate-cabeca > div:first-child { flex: 1; min-width: 260px; }
+.voz select { width: auto; flex: none; min-width: 0; max-width: 150px; padding-top: 5px; padding-bottom: 5px; font-size: 12.5px; }
+.voz-aviso { display: inline-flex; gap: 6px; align-items: center; }
+.voz-aviso .ico { width: 15px; height: 15px; }
+
+.chat { display: flex; flex-direction: column; gap: var(--s3); margin: var(--s5) 0; }
+.msg { display: flex; gap: var(--s2); align-items: flex-end; max-width: 78%; }
+.msg.ia { align-self: flex-start; }
+.msg.eu { align-self: flex-end; flex-direction: column; align-items: flex-end; }
+.bolha {
+  padding: 11px 15px; border-radius: var(--r-lg); line-height: 1.55; white-space: pre-wrap;
+  overflow-wrap: anywhere; font-size: 14px;
+}
+.msg.ia .bolha { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: var(--r-xs); }
+.msg.eu .bolha { background: var(--accent); color: var(--on-accent); border-bottom-right-radius: var(--r-xs); }
+.msg.pendente .bolha { opacity: .75; }
+.msg .ouvir { flex: none; opacity: .55; }
+.msg:hover .ouvir, .msg .ouvir:focus-visible { opacity: 1; }
+.lacuna {
+  display: flex; gap: 6px; align-items: flex-start; font-size: 12px; color: var(--warn);
+  background: var(--warn-soft); border-radius: var(--r-xs); padding: 4px 9px; max-width: 100%;
+}
+.lacuna .ico { width: 13px; height: 13px; flex: none; margin-top: 2px; }
+.digitando { display: inline-flex; gap: 4px; padding: 14px 16px; }
+.digitando span {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+  animation: pulando 1.1s infinite ease-in-out;
+}
+.digitando span:nth-child(2) { animation-delay: .15s; }
+.digitando span:nth-child(3) { animation-delay: .3s; }
+@keyframes pulando { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .digitando span { animation: none; } }
+.composer { position: sticky; bottom: var(--s4); box-shadow: var(--shadow-lg); }
+.composer textarea { resize: vertical; }
+
+.debate-avaliacao { margin-top: var(--s2); }
+.debate-avaliacao h3 { margin-top: 0; }
+.avaliacao { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.avaliacao li { display: flex; gap: var(--s2); align-items: flex-start; font-size: 13.5px; line-height: 1.5; }
+.avaliacao .ico { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.avaliacao.ok .ico { color: var(--ok); }
+.avaliacao.bad .ico { color: var(--warn); }
+@media (max-width: 900px) { .msg { max-width: 92%; } }

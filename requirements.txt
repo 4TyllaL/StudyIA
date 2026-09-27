@@ -1,6 +1,7 @@
 pywebview>=5.0        # janela nativa (usa o WebView2 do Windows)
 google-genai>=2.0     # geracao de questoes com Gemini
 pydantic>=2.7         # validacao da resposta da IA
+pypdf>=5.0            # le PDFs no modo debate
 
 # Só para empacotar/gerar arte — não precisa para rodar do código:
 pyinstaller>=6.0

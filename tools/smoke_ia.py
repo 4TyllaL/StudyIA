@@ -101,6 +101,7 @@ def roteiro(_janela=None) -> None:
         corpo = json.loads(F.Estado.corpos[0])
         cfg = corpo.get("generation_config", {})
         checar(cfg.get("max_output_tokens", 99999) <= 16000, f"teto de saída proporcional ao pedido ({cfg.get('max_output_tokens')} tokens)")
+        checar(cfg.get("thinking_level") == "low", f"nível de raciocínio 'low', aceito pelos 3.x ({cfg.get('thinking_level')})")
 
         secao("escolher quais adicionar")
         js("document.querySelector('[data-pick=\"0\"]').click()")
@@ -144,6 +145,17 @@ def roteiro(_janela=None) -> None:
         gerar("incompleto")
         esperar("document.querySelector('#ai-error .notice.error') !== null", "erro aparece")
         checar(bool(js("document.querySelector('#ai-error').textContent.includes('cortada')")), "diz que foi cortada (não 'bloqueada')")
+
+        secao("modelo que recusa o nível de raciocínio (erro 400 visto na API real)")
+        gerar("recusa-nivel")
+        esperar("document.querySelectorAll('#ai-preview .card-item').length === 5", "questões geradas mesmo assim")
+        checar(F.Estado.pedidos == 2, f"um reenvio sem o nível (feitos: {F.Estado.pedidos})")
+        checar(b"thinking_level" not in F.Estado.corpos[-1], "o reenvio vai sem thinking_level")
+        checar(not js("document.querySelector('#ai-error').textContent.trim()"), "nenhum erro na tela")
+        js("state.aiCards = []; renderAiPreview()")
+        gerar("recusa-nivel")
+        esperar("document.querySelectorAll('#ai-preview .card-item').length === 5", "gera de novo")
+        checar(F.Estado.pedidos == 1, f"o modelo fica anotado: 1 pedido só na vez seguinte (feitos: {F.Estado.pedidos})")
 
         secao("material grande demais")
         F.Estado.pedidos = 0
