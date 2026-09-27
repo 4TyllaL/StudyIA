@@ -22,6 +22,19 @@ request when you click *Generate*. That is also why the Windows firewall never p
 - **Two deliverables:** a portable `.exe` and a custom-built installer (no Inno Setup).
 - **API key encrypted** with Windows DPAPI; the backup export excludes it.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Home: decks with what is due today, accuracy and streak" width="49%">
+  <img src="docs/screenshots/study.png" alt="Wrong answer: shows what you picked, the correct one and why, and when it returns" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/progress.png" alt="Progress: 12-week activity heatmap, last 14 days, upcoming reviews" width="49%">
+  <img src="docs/screenshots/questions-light.png" alt="Question list in the light theme, with filters and search" width="49%">
+</p>
+
+*Home · wrong-answer feedback (with the scheduled return time) · progress · question list in the light theme.*
+
 ## Download
 
 Built executables are not stored in the repo. Get them from the **Releases** page, or build
