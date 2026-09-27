@@ -76,7 +76,7 @@ def salvar_splash() -> Path:
     img.paste(icone, (40, 56), icone)
 
     d.text((158, 74), "StudyIA", font=fonte(44), fill=BRANCO)
-    d.text((160, 130), "abrindo…", font=fonte(19, negrito=False), fill=(141, 155, 176))
+    # sem verbo: a mesma imagem serve para abrir e para desinstalar
     d.rounded_rectangle([160, 168, 420, 174], radius=3, fill=(46, 58, 82))
     d.rounded_rectangle([160, 168, 250, 174], radius=3, fill=AZUL)
 

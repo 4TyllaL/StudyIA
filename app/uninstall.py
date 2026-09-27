@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -21,14 +22,15 @@ SIM_NAO = 0x04 | 0x20      # MB_YESNO | MB_ICONQUESTION
 OK = 0x40                  # MB_ICONINFORMATION
 ERRO = 0x10
 RESPOSTA_SIM = 6
+SEMPRE_VISIVEL = 0x40000 | 0x10000   # MB_TOPMOST | MB_SETFOREGROUND: nada cobre a caixa
 
 
 def _perguntar(texto: str) -> bool:
-    return ctypes.windll.user32.MessageBoxW(None, texto, "Desinstalar StudyIA", SIM_NAO) == RESPOSTA_SIM
+    return ctypes.windll.user32.MessageBoxW(None, texto, "Desinstalar StudyIA", SIM_NAO | SEMPRE_VISIVEL) == RESPOSTA_SIM
 
 
 def _avisar(texto: str, icone: int = OK) -> None:
-    ctypes.windll.user32.MessageBoxW(None, texto, "StudyIA", icone)
+    ctypes.windll.user32.MessageBoxW(None, texto, "StudyIA", icone | SEMPRE_VISIVEL)
 
 
 # Só isto é removido. Nunca a pasta inteira: o usuário pode ter escolhido, na instalação,
@@ -76,9 +78,7 @@ def _iniciar_remocao(pasta: Path, com_dados: bool, silencioso: bool) -> int:
     return 0
 
 
-def _remover(pasta: Path, com_dados: bool, silencioso: bool) -> int:
-    time.sleep(1.0)  # dá tempo do StudyIA original encerrar
-
+def _remover_arquivos(pasta: Path, com_dados: bool) -> bool:
     for atalho in atalhos_conhecidos():
         try:
             atalho.unlink(missing_ok=True)
@@ -87,9 +87,66 @@ def _remover(pasta: Path, com_dados: bool, silencioso: bool) -> int:
 
     apagar_registro()
     ok = _apagar_lista(pasta, ARQUIVOS_DO_PROGRAMA)
-
     if com_dados:
         _apagar_lista(data_dir(), ARQUIVOS_DE_DADOS)
+    return ok
+
+
+def _com_janela_de_progresso(trabalho) -> None:
+    """Roda `trabalho()` mostrando "Desinstalando…" — sem isso a única coisa na tela seria a
+    tela de abertura do .exe, que diz "abrindo". Sem Tk disponível, só roda o trabalho."""
+    try:
+        import tkinter as tk
+    except Exception:
+        trabalho()
+        return
+
+    fundo, texto, fraco, azul = "#0f141c", "#ffffff", "#8d9bb0", "#6c9cff"
+    raiz = tk.Tk()
+    raiz.overrideredirect(True)
+    raiz.attributes("-topmost", True)
+    raiz.configure(bg=fundo, highlightthickness=1, highlightbackground="#2e3a52")
+    larg, alt = 420, 150
+    raiz.geometry(f"{larg}x{alt}+{(raiz.winfo_screenwidth() - larg) // 2}+{(raiz.winfo_screenheight() - alt) // 2}")
+    tk.Label(raiz, text="StudyIA", bg=fundo, fg=texto, font=("Segoe UI", 26, "bold")).pack(pady=(26, 0))
+    tk.Label(raiz, text="desinstalando…", bg=fundo, fg=fraco, font=("Segoe UI", 13)).pack()
+    barra = tk.Canvas(raiz, width=260, height=6, bg="#2e3a52", highlightthickness=0)
+    barra.pack(pady=(14, 0))
+    trecho = barra.create_rectangle(0, 0, 90, 6, fill=azul, width=0)
+
+    feito = threading.Event()
+
+    def rodar() -> None:
+        try:
+            trabalho()
+        finally:
+            feito.set()
+
+    def animar(x: int = 0) -> None:
+        if feito.is_set():
+            raiz.destroy()
+            return
+        x = (x + 8) % 350
+        barra.coords(trecho, x - 90, 0, x, 6)
+        raiz.after(30, animar, x)
+
+    threading.Thread(target=rodar, daemon=True).start()
+    animar()
+    raiz.mainloop()
+
+
+def _remover(pasta: Path, com_dados: bool, silencioso: bool) -> int:
+    resultado = {"ok": False}
+
+    def trabalho() -> None:
+        time.sleep(1.0)  # dá tempo do StudyIA original encerrar
+        resultado["ok"] = _remover_arquivos(pasta, com_dados)
+
+    if silencioso:
+        trabalho()
+    else:
+        _com_janela_de_progresso(trabalho)
+    ok = resultado["ok"]
 
     if not silencioso:
         if ok:

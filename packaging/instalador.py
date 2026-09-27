@@ -33,6 +33,7 @@ LINHA = "#2a3242"
 TEXTO = "#e7ecf3"
 FRACO = "#8d9bb0"
 AZUL = "#6c9cff"
+BARRA_LARG = 480
 VERDE = "#3ecf8e"
 
 FONTE = "Segoe UI"
@@ -237,15 +238,13 @@ class Instalador(tk.Tk):
         meio = tk.Frame(self.corpo, bg=FUNDO)
         meio.pack(fill="both", expand=True, padx=28, pady=40)
 
-        estilo = ttk.Style(self)
-        estilo.theme_use("default")
-        estilo.configure("StudyIA.Horizontal.TProgressbar", troughcolor=SUPERFICIE,
-                         background=AZUL, bordercolor=SUPERFICIE, lightcolor=AZUL,
-                         darkcolor=AZUL, thickness=8)
-
-        self.barra = ttk.Progressbar(meio, style="StudyIA.Horizontal.TProgressbar",
-                                     maximum=100, length=480)
+        # mesma barra do desinstalador e da tela de abertura: trilho escuro, trecho azul
+        self.barra = tk.Canvas(meio, width=BARRA_LARG, height=6, bg=LINHA, highlightthickness=0)
         self.barra.pack(pady=(10, 14))
+        self.trecho = self.barra.create_rectangle(0, 0, 0, 6, fill=AZUL, width=0)
+        self.alvo = 0.0
+        self.atual = 0.0
+        self._animar_barra()
         self.passo = tk.Label(meio, text="Preparando…", bg=FUNDO, fg=FRACO, font=(FONTE, 10))
         self.passo.pack()
 
@@ -253,9 +252,19 @@ class Instalador(tk.Tk):
         self.tela_progresso()
         threading.Thread(target=self._instalar_em_segundo_plano, daemon=True).start()
 
+    def _animar_barra(self) -> None:
+        """Enche a barra aos poucos até o valor real, em vez de dar saltos."""
+        if not self.barra.winfo_exists():
+            return
+        self.atual += (self.alvo - self.atual) * 0.18
+        if self.alvo - self.atual < 0.3:
+            self.atual = self.alvo
+        self.barra.coords(self.trecho, 0, 0, BARRA_LARG * self.atual / 100, 6)
+        self.after(20, self._animar_barra)
+
     def _progresso(self, valor: int, texto: str) -> None:
         def aplicar():
-            self.barra["value"] = valor
+            self.alvo = float(valor)
             self.passo.config(text=texto)
         self.after(0, aplicar)
 
@@ -263,7 +272,7 @@ class Instalador(tk.Tk):
         try:
             pasta = Path(self.destino.get())
             exe = realizar_instalacao(pasta, self.atalho_area.get(), self._progresso)
-            time.sleep(0.4)
+            time.sleep(0.9)  # deixa a barra chegar ao fim antes de trocar de tela
             self.after(0, lambda: self.tela_final(pasta, exe))
         except Exception as exc:
             self.after(0, lambda: self.tela_erro(exc))
@@ -320,13 +329,29 @@ def instalar_silencioso(argv: list[str]) -> int:
     return 0
 
 
+def fechar_splash() -> None:
+    """Tela de abertura do PyInstaller — só existe no .exe empacotado."""
+    try:
+        import pyi_splash  # type: ignore[import-not-found]
+
+        pyi_splash.close()
+    except Exception:
+        pass
+
+
 def main(argv: list[str]) -> int:
     if sys.platform != "win32":
         print("O instalador do StudyIA é para Windows.", file=sys.stderr)
         return 1
     if "--silencioso" in argv:
+        fechar_splash()
         return instalar_silencioso(argv)
-    Instalador().mainloop()
+    try:
+        janela = Instalador()
+        janela.update()      # desenha a janela antes de tirar a tela de abertura
+    finally:
+        fechar_splash()
+    janela.mainloop()
     return 0
 
 

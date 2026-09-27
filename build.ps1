@@ -39,6 +39,7 @@ if ($Apenas -in @("tudo", "programa")) {
         --icon (Join-Path $assets "studyia.ico") `
         --splash (Join-Path $assets "splash.png") `
         --add-data "$web;web" `
+        --hidden-import tkinter `
         --collect-all webview `
         --collect-all google.genai `
         (Join-Path $raiz "desktop.py")
@@ -61,6 +62,7 @@ if ($Apenas -in @("tudo", "instalador")) {
         --workpath (Join-Path $trabalho "instalador") `
         --specpath $trabalho `
         --icon (Join-Path $assets "studyia.ico") `
+        --splash (Join-Path $assets "splash.png") `
         --add-data "$programa;payload" `
         --add-data ("{0};assets" -f (Join-Path $assets "studyia.ico")) `
         --add-data ("{0};assets" -f (Join-Path $assets "studyia.png")) `

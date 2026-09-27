@@ -122,6 +122,8 @@ def main(argv: list[str]) -> int:
     if "--desinstalar" in argv or "--remover" in argv:
         from app.uninstall import executar
 
+        # A tela de abertura fica sempre por cima e cobria as caixas de pergunta.
+        fechar_splash()
         return executar(argv)
 
     if ja_esta_aberto():
